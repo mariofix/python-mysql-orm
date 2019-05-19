@@ -263,7 +263,7 @@ class query_builder
     
 
     def _wh(self, qb_key, key, value = NULL, type = 'AND ', escape = NULL):
-        qb_cache_key = (qb_key === 'qb_having') ? 'qb_cache_having' : 'qb_cache_where'
+        qb_cache_key = 'qb_cache_having' if qb_key == 'qb_having' else 'qb_cache_where'
 
         if instance(key, dict):
             key = {key: value}
@@ -298,7 +298,11 @@ class query_builder
             else:
                 k = self._protect_identifiers(k, False, escape)
             
-            qb_key = {'condition': prefix.k, 'value': v, 'escape': escape}
+            qb_key = {
+                'condition': f"{prefix}{k}", 
+                'value': v, 
+                'escape': escape
+            }
             self.qb_key.append(qb_key)
             if self.qb_caching == True:
                 self.qb_cache_key.append(qb_key)
@@ -458,208 +462,92 @@ class query_builder
         return self
     
 
-    def _group_get_type(self,type):
-    
-        if (self.qb_where_group_started)
-        
+    def _group_get_type(self, type):
+        if self.qb_where_group_started:
             type = ''
-            self.qb_where_group_started = FALSE
-        
-
+            self.qb_where_group_started = False
         return type
     
 
-    // --------------------------------------------------------------------
+    def group_by(self, by, escape = None):
 
-    /**
-     * GROUP BY
-     *
-     * @param   string  by
-     * @param   bool    escape
-     * @return  CI_DB_query_builder
-     */
-    def group_by(self,by, escape = NULL):
-    
-        is_bool(escape) OR escape = self._protect_identifiers
+        if not isinstance(escape, bool):
+            escape = self.__protect_identifiers
 
-        if (is_string(by))
-        
-            by = (escape === TRUE)
-                ? explode(',', by)
-                : array(by)
-        
+        if isinstance(by, str):
+            by = by.split(",") if escape else [by]
 
-        foreach (by as val)
-        
-            val = trim(val)
-
-            if (val !== '')
+        for val in by:
+            val = val.strip()
             
-                val = array('field' => val, 'escape' => escape)
-
-                self.qb_groupby[] = val
-                if (self.qb_caching === TRUE)
-                
-                    self.qb_cache_groupby[] = val
-                    self.qb_cache_exists[] = 'groupby'
-                
-            
-        
-
-        return this
+            if val != '':
+                val = {
+                    'field': val, 
+                    'escape': escape
+                }
+                self.qb_groupby.append(val)
+                if self.qb_caching:
+                    self.qb_cache_groupby.append(val)
+                    self.qb_cache_exists.append('groupby')
+        return self
     
 
-    // --------------------------------------------------------------------
-
-    /**
-     * HAVING
-     *
-     * Separates multiple calls with 'AND'.
-     *
-     * @param   string  key
-     * @param   string  value
-     * @param   bool    escape
-     * @return  CI_DB_query_builder
-     */
-    def having(self,key, value = NULL, escape = NULL):
-    
+    def having(self, key, value = None, escape = None):
         return self._wh('qb_having', key, value, 'AND ', escape)
     
-
-    // --------------------------------------------------------------------
-
-    /**
-     * OR HAVING
-     *
-     * Separates multiple calls with 'OR'.
-     *
-     * @param   string  key
-     * @param   string  value
-     * @param   bool    escape
-     * @return  CI_DB_query_builder
-     */
-    def or_having(self,key, value = NULL, escape = NULL):
-    
+    def or_having(self, key, value = None, escape = None):
         return self._wh('qb_having', key, value, 'OR ', escape)
     
+    def order_by(self, orderby, direction = '', escape = None):
+        direction = direction.strip().upper()
 
-    // --------------------------------------------------------------------
-
-    /**
-     * ORDER BY
-     *
-     * @param   string  orderby
-     * @param   string  direction   ASC, DESC or RANDOM
-     * @param   bool    escape
-     * @return  CI_DB_query_builder
-     */
-    def order_by(self,orderby, direction = '', escape = NULL):
-    
-        direction = strtoupper(trim(direction))
-
-        if (direction === 'RANDOM')
-        
+        if direction == 'RANDOM':
             direction = ''
-
-            // Do we have a seed value?
-            orderby = ctype_digit((string) orderby)
-                ? sprintf(self._random_keyword[1], orderby)
-                : self._random_keyword[0]
-        
-        elseif (empty(orderby))
-        
-            return this
-        
-        elseif (direction !== '')
-        
-            direction = in_array(direction, array('ASC', 'DESC'), TRUE) ? ' '.direction : ''
-        
-
-        is_bool(escape) OR escape = self._protect_identifiers
-
-        if (escape === FALSE)
-        
-            qb_orderby[] = array('field' => orderby, 'direction' => direction, 'escape' => FALSE)
-        
-        else
-        
-            qb_orderby = array()
-            foreach (explode(',', orderby) as field)
+            # Do we have a seed value?
+            orderby = self._random_keyword[1] if isinstance(order_by, int) else self._random_keyword[0]
+        elif len(orderby) == 0:
+            return self
+        elif direction != '':
+            direction = ' ' + direction if direction in ['ASC', 'DESC'] else ' ASC'
             
-                qb_orderby[] = (direction === '' && preg_match('/\s+(ASC|DESC)/i', rtrim(field), match, PREG_OFFSET_CAPTURE))
-                    ? array('field' => ltrim(substr(field, 0, match[0][1])), 'direction' => ' '.match[1][0], 'escape' => TRUE)
-                    : array('field' => trim(field), 'direction' => direction, 'escape' => TRUE)
-            
-        
+        if not isinstance(escape, bool):
+            escape = self.__protect_identifiers
 
-        self.qb_orderby = array_merge(self.qb_orderby, qb_orderby)
-        if (self.qb_caching === TRUE)
-        
-            self.qb_cache_orderby = array_merge(self.qb_cache_orderby, qb_orderby)
-            self.qb_cache_exists[] = 'orderby'
-        
+        if not escape:
+            qb_orderby.append({'field': orderby, 'direction': direction, 'escape': False})
+        else:
+            qb_orderby = []
+            for field in orderby.split(","):
+                match = re.search('/\s+(ASC|DESC)/i', field, match)
+                if (direction == '' and match):
+                    qb_orderby.append({'field': match[0][1][field, 0], 'direction': f"{match[1][0]}", escape: True })
+                else:
+                    qb_orderby.append({'field': field, 'direction': direction, 'escape': True})
 
-        return this
+        self.qb_orderby.append(qb_orderby)
+        if self.qb_caching:
+            self.qb_cache_orderby.append(qb_orderby)
+            self.qb_cache_exists.append('orderby')
+        return self
     
 
-    // --------------------------------------------------------------------
-
-    /**
-     * LIMIT
-     *
-     * @param   int value   LIMIT value
-     * @param   int offset  OFFSET value
-     * @return  CI_DB_query_builder
-     */
-    def limit(self,value, offset = 0):
+    def limit(self, value, offset = 0):
     
         is_null(value) OR self.qb_limit = (int) value
         empty(offset) OR self.qb_offset = (int) offset
 
         return this
     
-
-    // --------------------------------------------------------------------
-
-    /**
-     * Sets the OFFSET value
-     *
-     * @param   int offset  OFFSET value
-     * @return  CI_DB_query_builder
-     */
     def offset(self,offset):
     
         empty(offset) OR self.qb_offset = (int) offset
         return this
     
-
-    // --------------------------------------------------------------------
-
-    /**
-     * LIMIT string
-     *
-     * Generates a platform-specific LIMIT clause.
-     *
-     * @param   string  sql SQL Query
-     * @return  string
-     */
     def _limit(self,sql):
     
         return sql.' LIMIT '.(self.qb_offset ? self.qb_offset.', ' : '').(int) self.qb_limit
     
 
-    // --------------------------------------------------------------------
-
-    /**
-     * The "set" function.
-     *
-     * Allows key/value pairs to be set for inserting or updating
-     *
-     * @param   mixed
-     * @param   string
-     * @param   bool
-     * @return  CI_DB_query_builder
-     */
     def set(self,key, value = '', escape = NULL):
     
         key = self._object_to_array(key)
@@ -679,18 +567,6 @@ class query_builder
 
         return this
     
-
-    // --------------------------------------------------------------------
-
-    /**
-     * Get SELECT query string
-     *
-     * Compiles a SELECT query string and returns the sql.
-     *
-     * @param   string  the table name to select from (optional)
-     * @param   bool    TRUE: resets QB values FALSE: leave QB values alone
-     * @return  string
-     */
     def get_compiled_select(self,table = '', reset = TRUE):
     
         if (table !== '')
@@ -709,19 +585,6 @@ class query_builder
         return select
     
 
-    // --------------------------------------------------------------------
-
-    /**
-     * Get
-     *
-     * Compiles the select statement based on the other functions called
-     * and runs the query
-     *
-     * @param   string  the table
-     * @param   string  the limit clause
-     * @param   string  the offset clause
-     * @return  CI_DB_result
-     */
     def get(self,table = '', limit = NULL, offset = NULL):
     
         if (table !== '')
@@ -740,18 +603,6 @@ class query_builder
         return result
     
 
-    // --------------------------------------------------------------------
-
-    /**
-     * "Count All Results" query
-     *
-     * Generates a platform-specific query string that counts all records
-     * returned by an Query Builder query.
-     *
-     * @param   string
-     * @param   bool    the reset clause
-     * @return  int
-     */
     def count_all_results(self,table = '', reset = TRUE):
     
         if (table !== '')
@@ -790,19 +641,6 @@ class query_builder
         return (int) row->numrows
     
 
-    // --------------------------------------------------------------------
-
-    /**
-     * get_where()
-     *
-     * Allows the where clause, limit and offset to be added directly
-     *
-     * @param   string  table
-     * @param   string  where
-     * @param   int limit
-     * @param   int offset
-     * @return  CI_DB_result
-     */
     def get_where(self,table = '', where = NULL, limit = NULL, offset = NULL):
     
         if (table !== '')
@@ -825,18 +663,6 @@ class query_builder
         return result
     
 
-    // --------------------------------------------------------------------
-
-    /**
-     * Insert_Batch
-     *
-     * Compiles batch insert strings and runs the queries
-     *
-     * @param   string  table   Table to insert into
-     * @param   array   set     An associative array of insert values
-     * @param   bool    escape  Whether to escape values and identifiers
-     * @return  int Number of rows inserted or FALSE on failure
-     */
     def insert_batch(self,table, set = NULL, escape = NULL, batch_size = 100):
     
         if (set === NULL)
@@ -880,33 +706,10 @@ class query_builder
         return affected_rows
     
 
-    // --------------------------------------------------------------------
-
-    /**
-     * Insert batch statement
-     *
-     * Generates a platform-specific insert string from the supplied data.
-     *
-     * @param   string  table   Table name
-     * @param   array   keys    INSERT keys
-     * @param   array   values  INSERT values
-     * @return  string
-     */
     def _insert_batch(self,table, keys, values):
     
         return 'INSERT INTO '.table.' ('.implode(', ', keys).') VALUES '.implode(', ', values)
     
-
-    // --------------------------------------------------------------------
-
-    /**
-     * The "set_insert_batch" function.  Allows key/value pairs to be set for batch inserts
-     *
-     * @param   mixed
-     * @param   string
-     * @param   bool
-     * @return  CI_DB_query_builder
-     */
     def set_insert_batch(self,key, value = '', escape = NULL):
     
         key = self._object_to_array_batch(key)
@@ -955,17 +758,6 @@ class query_builder
         return this
     
 
-    // --------------------------------------------------------------------
-
-    /**
-     * Get INSERT query string
-     *
-     * Compiles an insert query and returns the sql
-     *
-     * @param   string  the table to insert into
-     * @param   bool    TRUE: reset QB values FALSE: leave QB values alone
-     * @return  string
-     */
     def get_compiled_insert(self,table = '', reset = TRUE):
     
         if (self._validate_insert(table) === FALSE)
@@ -989,18 +781,6 @@ class query_builder
         return sql
     
 
-    // --------------------------------------------------------------------
-
-    /**
-     * Insert
-     *
-     * Compiles an insert string and runs the query
-     *
-     * @param   string  the table to insert data into
-     * @param   array   an associative array of insert values
-     * @param   bool    escape  Whether to escape values and identifiers
-     * @return  bool    TRUE on success, FALSE on failure
-     */
     def insert(self,table = '', set = NULL, escape = NULL):
     
         if (set !== NULL)
@@ -1025,18 +805,6 @@ class query_builder
         return self.query(sql)
     
 
-    // --------------------------------------------------------------------
-
-    /**
-     * Validate Insert
-     *
-     * This method is used by both insert() and get_compiled_insert() to
-     * validate that the there data is actually being set and that table
-     * has been chosen to be inserted into.
-     *
-     * @param   string  the table to insert data into
-     * @return  string
-     */
     def _validate_insert(self,table = ''):
     
         if (count(self.qb_set) === 0)
@@ -1056,17 +824,6 @@ class query_builder
         return TRUE
     
 
-    // --------------------------------------------------------------------
-
-    /**
-     * Replace
-     *
-     * Compiles an replace into string and runs the query
-     *
-     * @param   string  the table to replace data into
-     * @param   array   an associative array of insert values
-     * @return  bool    TRUE on success, FALSE on failure
-     */
     def replace(self,table = '', set = NULL):
     
         if (set !== NULL)
@@ -1095,51 +852,16 @@ class query_builder
         return self.query(sql)
     
 
-    // --------------------------------------------------------------------
-
-    /**
-     * Replace statement
-     *
-     * Generates a platform-specific replace string from the supplied data
-     *
-     * @param   string  the table name
-     * @param   array   the insert keys
-     * @param   array   the insert values
-     * @return  string
-     */
     def _replace(self,table, keys, values):
     
         return 'REPLACE INTO '.table.' ('.implode(', ', keys).') VALUES ('.implode(', ', values).')'
     
 
-    // --------------------------------------------------------------------
-
-    /**
-     * FROM tables
-     *
-     * Groups tables in FROM clauses if needed, so there is no confusion
-     * about operator precedence.
-     *
-     * Note: This is only used (and overridden) by MySQL and CUBRID.
-     *
-     * @return  string
-     */
     def _from_tables(self):
     
         return implode(', ', self.qb_from)
     
 
-    // --------------------------------------------------------------------
-
-    /**
-     * Get UPDATE query string
-     *
-     * Compiles an update query and returns the sql
-     *
-     * @param   string  the table to update
-     * @param   bool    TRUE: reset QB values FALSE: leave QB values alone
-     * @return  string
-     */
     def get_compiled_update(self,table = '', reset = TRUE):
     
         // Combine any cached components with the current statements
@@ -1160,19 +882,6 @@ class query_builder
         return sql
     
 
-    // --------------------------------------------------------------------
-
-    /**
-     * UPDATE
-     *
-     * Compiles an update string and runs the query.
-     *
-     * @param   string  table
-     * @param   array   set An associative array of update values
-     * @param   mixed   where
-     * @param   int limit
-     * @return  bool    TRUE on success, FALSE on failure
-     */
     def update(self,table = '', set = NULL, where = NULL, limit = NULL):
     
         // Combine any cached components with the current statements
@@ -1203,18 +912,6 @@ class query_builder
         return self.query(sql)
     
 
-    // --------------------------------------------------------------------
-
-    /**
-     * Validate Update
-     *
-     * This method is used by both update() and get_compiled_update() to
-     * validate that data is actually being set and that a table has been
-     * chosen to be update.
-     *
-     * @param   string  the table to update data on
-     * @return  bool
-     */
     def _validate_update(self,table):
     
         if (count(self.qb_set) === 0)
@@ -1234,18 +931,6 @@ class query_builder
         return TRUE
     
 
-    // --------------------------------------------------------------------
-
-    /**
-     * Update_Batch
-     *
-     * Compiles an update string and runs the query
-     *
-     * @param   string  the table to retrieve the results from
-     * @param   array   an associative array of update values
-     * @param   string  the where key
-     * @return  int number of rows affected or FALSE on failure
-     */
     def update_batch(self,table, set = NULL, index = NULL, batch_size = 100):
     
         // Combine any cached components with the current statements
@@ -1299,18 +984,6 @@ class query_builder
         return affected_rows
     
 
-    // --------------------------------------------------------------------
-
-    /**
-     * Update_Batch statement
-     *
-     * Generates a platform-specific batch update string from the supplied data
-     *
-     * @param   string  table   Table name
-     * @param   array   values  Update data
-     * @param   string  index   WHERE key
-     * @return  string
-     */
     def _update_batch(self,table, values, index):
     
         ids = array()
@@ -1340,16 +1013,6 @@ class query_builder
         return 'UPDATE '.table.' SET '.substr(cases, 0, -2).self._compile_wh('qb_where')
     
 
-    // --------------------------------------------------------------------
-
-    /**
-     * The "set_update_batch" function.  Allows key/value pairs to be set for batch updating
-     *
-     * @param   array
-     * @param   string
-     * @param   bool
-     * @return  CI_DB_query_builder
-     */
     def set_update_batch(self,key, index = '', escape = NULL):
     
         key = self._object_to_array_batch(key)
@@ -1389,16 +1052,6 @@ class query_builder
         return this
     
 
-    // --------------------------------------------------------------------
-
-    /**
-     * Empty Table
-     *
-     * Compiles a delete string and runs "DELETE FROM table"
-     *
-     * @param   string  the table to empty
-     * @return  bool    TRUE on success, FALSE on failure
-     */
     def empty_table(self,table = ''):
     
         if (table === '')
@@ -1420,18 +1073,6 @@ class query_builder
         return self.query(sql)
     
 
-    // --------------------------------------------------------------------
-
-    /**
-     * Truncate
-     *
-     * Compiles a truncate string and runs the query
-     * If the database does not support the truncate() command
-     * This function maps to "DELETE FROM table"
-     *
-     * @param   string  the table to truncate
-     * @return  bool    TRUE on success, FALSE on failure
-     */
     def truncate(self,table = ''):
     
         if (table === '')
@@ -1453,35 +1094,11 @@ class query_builder
         return self.query(sql)
     
 
-    // --------------------------------------------------------------------
-
-    /**
-     * Truncate statement
-     *
-     * Generates a platform-specific truncate string from the supplied data
-     *
-     * If the database does not support the truncate() command,
-     * then this method maps to 'DELETE FROM table'
-     *
-     * @param   string  the table name
-     * @return  string
-     */
     def _truncate(self,table):
     
         return 'TRUNCATE '.table
     
 
-    // --------------------------------------------------------------------
-
-    /**
-     * Get DELETE query string
-     *
-     * Compiles a delete query string and returns the sql
-     *
-     * @param   string  the table to delete from
-     * @param   bool    TRUE: reset QB values FALSE: leave QB values alone
-     * @return  string
-     */
     def get_compiled_delete(self,table = '', reset = TRUE):
     
         self.return_delete_sql = TRUE
@@ -1490,19 +1107,6 @@ class query_builder
         return sql
     
 
-    // --------------------------------------------------------------------
-
-    /**
-     * Delete
-     *
-     * Compiles a delete string and runs the query
-     *
-     * @param   mixed   the table(s) to delete from. String or array
-     * @param   mixed   the where clause
-     * @param   mixed   the limit clause
-     * @param   bool
-     * @return  mixed
-     */
     def delete(self,table = '', where = '', limit = NULL, reset_data = TRUE):
     
         // Combine any cached components with the current statements
@@ -1557,32 +1161,12 @@ class query_builder
         return (self.return_delete_sql === TRUE) ? sql : self.query(sql)
     
 
-    // --------------------------------------------------------------------
-
-    /**
-     * Delete statement
-     *
-     * Generates a platform-specific delete string from the supplied data
-     *
-     * @param   string  the table name
-     * @return  string
-     */
     def _delete(self,table):
     
         return 'DELETE FROM '.table.self._compile_wh('qb_where')
             .(self.qb_limit !== FALSE ? ' LIMIT '.self.qb_limit : '')
     
 
-    // --------------------------------------------------------------------
-
-    /**
-     * DB Prefix
-     *
-     * Prepends a database prefix if one exists in configuration
-     *
-     * @param   string  the table
-     * @return  string
-     */
     def dbprefix(self,table = ''):
     
         if (table === '')
@@ -1593,31 +1177,11 @@ class query_builder
         return self.dbprefix.table
     
 
-    // --------------------------------------------------------------------
-
-    /**
-     * Set DB Prefix
-     *
-     * Set's the DB Prefix to something without needing to reconnect
-     *
-     * @param   string  the prefix
-     * @return  string
-     */
     def set_dbprefix(self,prefix = ''):
     
         return self.dbprefix = prefix
     
 
-    // --------------------------------------------------------------------
-
-    /**
-     * Track Aliases
-     *
-     * Used to track SQL statements written with aliased tables.
-     *
-     * @param   string  The table to inspect
-     * @return  string
-     */
     def _track_aliases(self,table):
     
         if (is_array(table))
@@ -1658,17 +1222,6 @@ class query_builder
         
     
 
-    // --------------------------------------------------------------------
-
-    /**
-     * Compile the SELECT statement
-     *
-     * Generates a query string based on which functions were used.
-     * Should not be called directly.
-     *
-     * @param   bool    select_override
-     * @return  string
-     */
     def _compile_select(self,select_override = FALSE):
     
         // Combine any cached components with the current statements
@@ -1728,20 +1281,6 @@ class query_builder
         return sql
     
 
-    // --------------------------------------------------------------------
-
-    /**
-     * Compile WHERE, HAVING statements
-     *
-     * Escapes identifiers in WHERE and HAVING statements at execution time.
-     *
-     * Required so that aliases are tracked properly, regardless of whether
-     * where(), or_where(), having(), or_having are called prior to from(),
-     * join() and dbprefix is added only if needed.
-     *
-     * @param   string  qb_key  'qb_where' or 'qb_having'
-     * @return  string  SQL statement
-     */
     def _compile_wh(self,qb_key):
     
         if (count(self.qb_key) > 0)
@@ -1804,19 +1343,6 @@ class query_builder
         return ''
     
 
-    // --------------------------------------------------------------------
-
-    /**
-     * Compile GROUP BY
-     *
-     * Escapes identifiers in GROUP BY statements at execution time.
-     *
-     * Required so that aliases are tracked properly, regardless of whether
-     * group_by() is called prior to from(), join() and dbprefix is added
-     * only if needed.
-     *
-     * @return  string  SQL statement
-     */
     def _compile_group_by(self):
     
         if (count(self.qb_groupby) > 0)
@@ -1840,19 +1366,6 @@ class query_builder
         return ''
     
 
-    // --------------------------------------------------------------------
-
-    /**
-     * Compile ORDER BY
-     *
-     * Escapes identifiers in ORDER BY statements at execution time.
-     *
-     * Required so that aliases are tracked properly, regardless of whether
-     * order_by() is called prior to from(), join() and dbprefix is added
-     * only if needed.
-     *
-     * @return  string  SQL statement
-     */
     def _compile_order_by(self):
     
         if (empty(self.qb_orderby))
@@ -1878,16 +1391,6 @@ class query_builder
         return "\nORDER BY ".implode(', ', self.qb_orderby)
     
 
-    // --------------------------------------------------------------------
-
-    /**
-     * Object to Array
-     *
-     * Takes an object as input and converts the class variables to array key/vals
-     *
-     * @param   object
-     * @return  array
-     */
     def _object_to_array(self,object):
     
         if ( ! is_object(object))
@@ -1908,16 +1411,6 @@ class query_builder
         return array
     
 
-    // --------------------------------------------------------------------
-
-    /**
-     * Object to Array
-     *
-     * Takes an object as input and converts the class variables to array key/vals
-     *
-     * @param   object
-     * @return  array
-     */
     def _object_to_array_batch(self,object):
     
         if ( ! is_object(object))
@@ -1945,45 +1438,18 @@ class query_builder
         return array
     
 
-    // --------------------------------------------------------------------
-
-    /**
-     * Start Cache
-     *
-     * Starts QB caching
-     *
-     * @return  CI_DB_query_builder
-     */
     def start_cache(self):
     
         self.qb_caching = TRUE
         return this
     
 
-    // --------------------------------------------------------------------
-
-    /**
-     * Stop Cache
-     *
-     * Stops QB caching
-     *
-     * @return  CI_DB_query_builder
-     */
     def stop_cache(self):
     
         self.qb_caching = FALSE
         return this
     
 
-    // --------------------------------------------------------------------
-
-    /**
-     * Flush Cache
-     *
-     * Empties the QB cache
-     *
-     * @return  CI_DB_query_builder
-     */
     def flush_cache(self):
     
         self._reset_run(array(
@@ -2003,16 +1469,6 @@ class query_builder
         return this
     
 
-    // --------------------------------------------------------------------
-
-    /**
-     * Merge Cache
-     *
-     * When called, this function merges any cached QB arrays with
-     * locally called ones.
-     *
-     * @return  void
-     */
     def _merge_cache(self):
     
         if (count(self.qb_cache_exists) === 0)
@@ -2050,16 +1506,6 @@ class query_builder
         
     
 
-    // --------------------------------------------------------------------
-
-    /**
-     * Is literal
-     *
-     * Determines if a string represents a literal value or a field name
-     *
-     * @param   string  str
-     * @return  bool
-     */
     def _is_literal(self,str):
     
         str = trim(str)
@@ -2080,15 +1526,6 @@ class query_builder
         return in_array(str[0], _str, TRUE)
     
 
-    // --------------------------------------------------------------------
-
-    /**
-     * Reset Query Builder values.
-     *
-     * Publicly-visible method to reset the QB values.
-     *
-     * @return  CI_DB_query_builder
-     */
     def reset_query(self):
     
         self._reset_select()
@@ -2096,14 +1533,6 @@ class query_builder
         return this
     
 
-    // --------------------------------------------------------------------
-
-    /**
-     * Resets the query builder values.  Called by the get() function
-     *
-     * @param   array   An array of fields to reset
-     * @return  void
-     */
     def _reset_run(self,qb_reset_items):
     
         foreach (qb_reset_items as item => default_value)
@@ -2112,13 +1541,6 @@ class query_builder
         
     
 
-    // --------------------------------------------------------------------
-
-    /**
-     * Resets the query builder values.  Called by the get() function
-     *
-     * @return  void
-     */
     def _reset_select(self):
     
         self._reset_run(array(
@@ -2137,15 +1559,6 @@ class query_builder
         ))
     
 
-    // --------------------------------------------------------------------
-
-    /**
-     * Resets the query builder "write" values.
-     *
-     * Called by the insert() update() insert_batch() update_batch() and delete() functions
-     *
-     * @return  void
-     */
     def _reset_write(self):
     
         self._reset_run(array(
@@ -2158,5 +1571,3 @@ class query_builder
             'qb_keys'   => array(),
             'qb_limit'  => FALSE
         ))
-    
-
