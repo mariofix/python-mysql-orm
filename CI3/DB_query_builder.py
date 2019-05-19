@@ -340,10 +340,10 @@ class query_builder
             where_in = values.items()
         
 
-        prefix = '' if len(self.ar_where) == 0 else type
+        prefix = '' if len(self.qb_where) == 0 and len(self.qb_cache_where) == 0 else type
 
         where_in = {
-            'condition': prefix+key+not_in+" IN(" + ", ".join(self.ar_wherein) + ") "
+            'condition': f"{prefix} {key} {not_in} IN({", ".join(self.ar_wherein)}) "
             'value': None,
             'escape': escape
         }
@@ -358,242 +358,106 @@ class query_builder
     def like(self, field, match = '', side = 'both', escape = None):
         return self._like(field, match, 'AND ', side, '', escape)
     
-
-    // --------------------------------------------------------------------
-
-    /**
-     * NOT LIKE
-     *
-     * Generates a NOT LIKE portion of the query.
-     * Separates multiple calls with 'AND'.
-     *
-     * @param   mixed   field
-     * @param   string  match
-     * @param   string  side
-     * @param   bool    escape
-     * @return  CI_DB_query_builder
-     */
-    def not_like(self,field, match = '', side = 'both', escape = NULL):
-    
+    def not_like(self, field, match = '', side = 'both', escape = None):
         return self._like(field, match, 'AND ', side, 'NOT', escape)
     
-
-    // --------------------------------------------------------------------
-
-    /**
-     * OR LIKE
-     *
-     * Generates a %LIKE% portion of the query.
-     * Separates multiple calls with 'OR'.
-     *
-     * @param   mixed   field
-     * @param   string  match
-     * @param   string  side
-     * @param   bool    escape
-     * @return  CI_DB_query_builder
-     */
-    def or_like(self,field, match = '', side = 'both', escape = NULL):
-    
+    def or_like(self, field, match = '', side = 'both', escape = None):
         return self._like(field, match, 'OR ', side, '', escape)
     
-
-    // --------------------------------------------------------------------
-
-    /**
-     * OR NOT LIKE
-     *
-     * Generates a NOT LIKE portion of the query.
-     * Separates multiple calls with 'OR'.
-     *
-     * @param   mixed   field
-     * @param   string  match
-     * @param   string  side
-     * @param   bool    escape
-     * @return  CI_DB_query_builder
-     */
-    def or_not_like(self,field, match = '', side = 'both', escape = NULL):
-    
+    def or_not_like(self, field, match = '', side = 'both', escape = None):
         return self._like(field, match, 'OR ', side, 'NOT', escape)
     
-
-    // --------------------------------------------------------------------
-
-    /**
-     * Internal LIKE
-     *
-     * @used-by like()
-     * @used-by or_like()
-     * @used-by not_like()
-     * @used-by or_not_like()
-     *
-     * @param   mixed   field
-     * @param   string  match
-     * @param   string  type
-     * @param   string  side
-     * @param   string  not
-     * @param   bool    escape
-     * @return  CI_DB_query_builder
-     */
-    def _like(self,field, match = '', type = 'AND ', side = 'both', not = '', escape = NULL):
+    def _like(self, field, match = '', type = 'AND ', side = 'both', not_in = '', escape = None):
     
-        if ( ! is_array(field))
-        
-            field = array(field => match)
-        
+        if not isinstance(field, dict):
+            field = {field: match}
 
-        is_bool(escape) OR escape = self._protect_identifiers
-        // lowercase side in case somebody writes e.g. 'BEFORE' instead of 'before' (doh)
-        side = strtolower(side)
 
-        foreach (field as k => v)
+        if not isinstance(escape, bool):
+            escape = self.__protect_identifiers
+
+        # lowercase side in case somebody writes e.g. 'BEFORE' instead of 'before' (doh)
+        side = side.lower()
+
+        for k,v in field.item():
         
-            prefix = (count(self.qb_where) === 0 && count(self.qb_cache_where) === 0)
-                ? self._group_get_type('') : self._group_get_type(type)
+            prefix = '' if len(self.qb_where) == 0 and len(self.qb_cache_where) else type
 
-            if (escape === TRUE)
-            
+            if escape:
                 v = self.escape_like_str(v)
             
+            if side == 'none':
+                v = f"'{v}'"
+            elif side == 'before':
+                v = f"'%{v}'"
+            elif side == 'after':
+                v = f"'{v}%'"
+            else:
+                v = f"'%{v}%'"
 
-            switch (side)
-            
-                case 'none':
-                    v = "'v'"
-                    break
-                case 'before':
-                    v = "'%v'"
-                    break
-                case 'after':
-                    v = "'v%'"
-                    break
-                case 'both':
-                default:
-                    v = "'%v%'"
-                    break
+            # some platforms require an escape sequence definition for LIKE wildcards
+            if escape and self._like_escape_str !== '':
+                v = v % (self._like_escape_str, self._like_escape_chr)
             
 
-            // some platforms require an escape sequence definition for LIKE wildcards
-            if (escape === TRUE && self._like_escape_str !== '')
-            
-                v .= sprintf(self._like_escape_str, self._like_escape_chr)
-            
-
-            qb_where = array('condition' => "prefix k not LIKE v", 'value' => NULL, 'escape' => escape)
-            self.qb_where[] = qb_where
-            if (self.qb_caching === TRUE)
-            
-                self.qb_cache_where[] = qb_where
-                self.qb_cache_exists[] = 'where'
-            
-        
-
-        return this
+            qb_where = {
+                'condition': f"{prefix} {k} {not_in} LIKE {v}", 
+                'value': None, 
+                'escape': escape
+            }
+            self.qb_where.append(qb_where)
+            if self.qb_caching:
+                self.qb_cache_where.append(qb_where)
+                self.qb_cache_exists.append('where')
+        return self
     
 
-    // --------------------------------------------------------------------
-
-    /**
-     * Starts a query group.
-     *
-     * @param   string  not (Internal use only)
-     * @param   string  type    (Internal use only)
-     * @return  CI_DB_query_builder
-     */
-    def group_start(self,not = '', type = 'AND '):
-    
+    def group_start(self, not_in = '', type = 'AND '):
         type = self._group_get_type(type)
-
-        self.qb_where_group_started = TRUE
-        prefix = (count(self.qb_where) === 0 && count(self.qb_cache_where) === 0) ? '' : type
-        where = array(
-            'condition' => prefix.not.str_repeat(' ', ++self.qb_where_group_count).' (',
-            'value' => NULL,
-            'escape' => FALSE
-        )
-
-        self.qb_where[] = where
-        if (self.qb_caching)
-        
-            self.qb_cache_where[] = where
-        
-
-        return this
+        self.qb_where_group_started = True
+        prefix = "" if len(self.qb_where) == 0 and len(self.qb_cache_where) == 0 else type
+        v = ''
+        for c in range(1, self.qb_where_group_count):
+            v = v % v
+        where = {
+            'condition': f"{prefix} {not_in} {v}",
+            'value': None
+            'escape': False
+        }
+        self.qb_where.append(where)
+        if self.qb_caching
+            self.qb_cache_where.append(where)
+        return self
     
 
-    // --------------------------------------------------------------------
-
-    /**
-     * Starts a query group, but ORs the group
-     *
-     * @return  CI_DB_query_builder
-     */
     def or_group_start(self):
-    
         return self.group_start('', 'OR ')
     
 
-    // --------------------------------------------------------------------
-
-    /**
-     * Starts a query group, but NOTs the group
-     *
-     * @return  CI_DB_query_builder
-     */
     def not_group_start(self):
-    
         return self.group_start('NOT ', 'AND ')
     
 
-    // --------------------------------------------------------------------
-
-    /**
-     * Starts a query group, but OR NOTs the group
-     *
-     * @return  CI_DB_query_builder
-     */
-    def or_not_group_start(self):
-    
+    def or_not_group_start(self):    
         return self.group_start('NOT ', 'OR ')
     
-
-    // --------------------------------------------------------------------
-
-    /**
-     * Ends a query group
-     *
-     * @return  CI_DB_query_builder
-     */
     def group_end(self):
-    
-        self.qb_where_group_started = FALSE
+        self.qb_where_group_started = False
+        v = ''
+        for c in range(1, self.qb_where_group_count):
+            v = v % v
         where = array(
-            'condition' => str_repeat(' ', self.qb_where_group_count--).')',
-            'value' => NULL,
-            'escape' => FALSE
+            'condition': f'{v})'
+            'value': None,
+            'escape': False
         )
 
-        self.qb_where[] = where
-        if (self.qb_caching)
-        
-            self.qb_cache_where[] = where
-        
-
-        return this
+        self.qb_where.append(where)
+        if self.qb_caching:
+            self.qb_cache_where.append(where)
+        return self
     
 
-    // --------------------------------------------------------------------
-
-    /**
-     * Group_get_type
-     *
-     * @used-by group_start()
-     * @used-by _like()
-     * @used-by _wh()
-     * @used-by _where_in()
-     *
-     * @param   string  type
-     * @return  string
-     */
     def _group_get_type(self,type):
     
         if (self.qb_where_group_started)
