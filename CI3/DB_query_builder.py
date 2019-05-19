@@ -114,11 +114,11 @@ class query_builder
         return self._max_min_avg_sum(select, alias, 'AVG')
     
 
-    def select_sum(self,select = '', alias = ''):
+    def select_sum(self, select = '', alias = ''):
         return self._max_min_avg_sum(select, alias, 'SUM')
     
 
-    def _max_min_avg_sum(self,select = '', alias = '', type = 'MAX'):
+    def _max_min_avg_sum(self, select = '', alias = '', type = 'MAX'):
         if not isinstance(select, string) or select == '':
             self.display_error('db_invalid_query')
         
@@ -141,7 +141,7 @@ class query_builder
         return self
     
 
-    def _create_alias_from_table(self,item):
+    def _create_alias_from_table(self, item):
     
         if '.' in item:
             return item.split('.')[:-1]
@@ -155,119 +155,63 @@ class query_builder
         """
     
 
-    // --------------------------------------------------------------------
-
-    /**
-     * DISTINCT
-     *
-     * Sets a flag which tells the query string compiler to add DISTINCT
-     *
-     * @param   bool    val
-     * @return  CI_DB_query_builder
-     */
-    def distinct(self,val = TRUE):
-    
-        self.qb_distinct = is_bool(val) ? val : TRUE
-        return this
+    def distinct(self, val = True):
+        self.ar_distinct = val if isinstance(val, bool) else True
+        return self
     
 
-    // --------------------------------------------------------------------
-
-    /**
-     * From
-     *
-     * Generates the FROM portion of the query
-     *
-     * @param   mixed   from    can be a string or array
-     * @return  CI_DB_query_builder
-     */
-    def from(self,from):
-    
-        foreach ((array) from as val)
-        
-            if (strpos(val, ',') !== FALSE)
-            
-                foreach (explode(',', val) as v)
-                
-                    v = trim(v)
+    def table(self, table):
+        for val in table:
+            if ',' in val:
+                for v in val.split(','):
+                    v = v.strip()
                     self._track_aliases(v)
 
-                    self.qb_from[] = v = self.protect_identifiers(v, TRUE, NULL, FALSE)
+                    self.ar_from.append(self._protect_identifiers(v, True, None, False))
 
-                    if (self.qb_caching === TRUE)
-                    
-                        self.qb_cache_from[] = v
-                        self.qb_cache_exists[] = 'from'
-                    
-                
-            
-            else
-            
-                val = trim(val)
+                    if self.ar_caching == True:
+                        self.ar_cache_from.append(self._protect_identifiers(v, True, None, False))
+                        self.ar_cache_exists.append('from')
+            else:
+                val = val.strip()
 
-                // Extract any aliases that might exist. We use this information
-                // in the protect_identifiers to know whether to add a table prefix
+                # any aliases that might exist.  We use this information
+                # the _protect_identifiers to know whether to add a table prefix
                 self._track_aliases(val)
 
-                self.qb_from[] = val = self.protect_identifiers(val, TRUE, NULL, FALSE)
+                self.ar_from.append(self._protect_identifiers(val, True, None, False))
 
-                if (self.qb_caching === TRUE)
-                
-                    self.qb_cache_from[] = val
-                    self.qb_cache_exists[] = 'from'
-                
-            
-        
+                if self.ar_caching == True:
+                    self.ar_cache_from.append(self._protect_identifiers(val, True, None, False))
+                    self.ar_cache_exists.append('from')
+        return self
 
-        return this
+    def join(self, table, cond, type = '', escape = None):
     
+        if type != '':
+            type = type.strip().upper()
 
-    // --------------------------------------------------------------------
-
-    /**
-     * JOIN
-     *
-     * Generates the JOIN portion of the query
-     *
-     * @param   string
-     * @param   string  the join condition
-     * @param   string  the type of join
-     * @param   string  whether not to try to escape identifiers
-     * @return  CI_DB_query_builder
-     */
-    def join(self,table, cond, type = '', escape = NULL):
-    
-        if (type !== '')
-        
-            type = strtoupper(trim(type))
-
-            if ( ! in_array(type, array('LEFT', 'RIGHT', 'OUTER', 'INNER', 'LEFT OUTER', 'RIGHT OUTER'), TRUE))
-            
+            if type not in ['LEFT', 'RIGHT', 'OUTER', 'INNER', 'LEFT OUTER', 'RIGHT OUTER']:
                 type = ''
-            
-            else
-            
-                type .= ' '
-            
+            else:
+                type += ' '    
         
 
-        // Extract any aliases that might exist. We use this information
-        // in the protect_identifiers to know whether to add a table prefix
+        # Extract any aliases that might exist. We use this information
+        # in the protect_identifiers to know whether to add a table prefix
         self._track_aliases(table)
 
-        is_bool(escape) OR escape = self._protect_identifiers
+        if not isinstance(escape, bool):
+            escape = self._protect_identifiers
 
-        if ( ! self._has_operator(cond))
-        
-            cond = ' USING ('.(escape ? self.escape_identifiers(cond) : cond).')'
-        
-        elseif (escape === FALSE)
-        
+        if not self._has_operator(cond):
+            cond = f' USING ('{escape = if self.escape_identifiers(cond) else: cond}')'
+        else if escape == False:
             cond = ' ON '.cond
         
-        else
+        else:
         
-            // Split multiple conditions
+            # Split multiple conditions
             if (preg_match_all('/\sAND\s|\sOR\s/i', cond, joints, PREG_OFFSET_CAPTURE))
             
                 conditions = array()
@@ -298,285 +242,120 @@ class query_builder
                     : conditions[i]
             
         
-
-        // Do we want to escape the table name?
-        if (escape === TRUE)
-        
-            table = self.protect_identifiers(table, TRUE, NULL, FALSE)
+        if escape == True:
+            table = self.protect_identifiers(table, True, None, False)
         
 
-        // Assemble the JOIN statement
-        self.qb_join[] = join = type.'JOIN '.table.cond
-
-        if (self.qb_caching === TRUE)
         
-            self.qb_cache_join[] = join
-            self.qb_cache_exists[] = 'join'
-        
-
-        return this
+        join = type.'JOIN '.table.cond
+        self.qb_join.append(join)
+        if self.qb_caching == True:
+            self.qb_cache_join.append(join)
+            self.qb_cache_exists.append('join')
+        return self
     
 
-    // --------------------------------------------------------------------
-
-    /**
-     * WHERE
-     *
-     * Generates the WHERE portion of the query.
-     * Separates multiple calls with 'AND'.
-     *
-     * @param   mixed
-     * @param   mixed
-     * @param   bool
-     * @return  CI_DB_query_builder
-     */
-    def where(self,key, value = NULL, escape = NULL):
-    
+    def where(self, key, value = NULL, escape = NULL):
         return self._wh('qb_where', key, value, 'AND ', escape)
     
-
-    // --------------------------------------------------------------------
-
-    /**
-     * OR WHERE
-     *
-     * Generates the WHERE portion of the query.
-     * Separates multiple calls with 'OR'.
-     *
-     * @param   mixed
-     * @param   mixed
-     * @param   bool
-     * @return  CI_DB_query_builder
-     */
-    def or_where(self,key, value = NULL, escape = NULL):
-    
+    def or_where(self, key, value = NULL, escape = NULL):    
         return self._wh('qb_where', key, value, 'OR ', escape)
     
 
-    // --------------------------------------------------------------------
-
-    /**
-     * WHERE, HAVING
-     *
-     * @used-by where()
-     * @used-by or_where()
-     * @used-by having()
-     * @used-by or_having()
-     *
-     * @param   string  qb_key  'qb_where' or 'qb_having'
-     * @param   mixed   key
-     * @param   mixed   value
-     * @param   string  type
-     * @param   bool    escape
-     * @return  CI_DB_query_builder
-     */
-    def _wh(self,qb_key, key, value = NULL, type = 'AND ', escape = NULL):
-    
+    def _wh(self, qb_key, key, value = NULL, type = 'AND ', escape = NULL):
         qb_cache_key = (qb_key === 'qb_having') ? 'qb_cache_having' : 'qb_cache_where'
 
-        if ( ! is_array(key))
+        if instance(key, dict):
+            key = {key: value}
         
-            key = array(key => value)
+        # If the escape value was not set will base it on the global setting
+        if not isinstance(escape, bool):
+            escape = self.__protect_identifiers
+
+        for k,v in key.items():
         
+            if isinstance(v, int):
+                v = str(v)
+            prefix = '' if len(self.ar_where) == 0 and len(self.ar_cache_where) == 0 else type
 
-        // If the escape value was not set will base it on the global setting
-        is_bool(escape) OR escape = self._protect_identifiers
+            if v is None and not self._has_operator(k):
+                # value appears not to have been set, assign the test to IS NULL
+                k += ' IS NULL'
 
-        foreach (key as k => v)
-        
-            prefix = (count(self.qb_key) === 0 && count(self.qb_cache_key) === 0)
-                ? self._group_get_type('')
-                : self._group_get_type(type)
+            if not v is None:
+                if escape == True:
+                    k = self._protect_identifiers(k, False, escape)
 
-            if (v !== NULL)
-            
-                if (escape === TRUE)
+                    v = ' ' + self.escape(v)
                 
-                    v = self.escape(v)
-                
+                if not self._has_operator(k):
+                    k += ' = '
 
-                if ( ! self._has_operator(k))
-                
-                    k .= ' = '
-                
+            match = re.search('/\s*(!?=|<>|\sIS(?:\s+NOT)?\s)\s*/i', k, $match)
+            if match:
+                k = k.[0, match[0][1]].append(" IS NULL" if match[1][0] == '==' else " IS NOT NULL")
+                k = match[1] + match[2] + match[3]
+            else:
+                k = self._protect_identifiers(k, False, escape)
             
-            elseif ( ! self._has_operator(k))
-            
-                // value appears not to have been set, assign the test to IS NULL
-                k .= ' IS NULL'
-            
-            elseif (preg_match('/\s*(!?=|<>|\sIS(?:\s+NOT)?\s)\s*/i', k, match, PREG_OFFSET_CAPTURE))
-            
-                k = substr(k, 0, match[0][1]).(match[1][0] === '=' ? ' IS NULL' : ' IS NOT NULL')
-            
+            qb_key = {'condition': prefix.k, 'value': v, 'escape': escape}
+            self.qb_key.append(qb_key)
+            if self.qb_caching == True:
+                self.qb_cache_key.append(qb_key)
+                self.qb_cache_exists.append(qb_key[qb_key:3])
+        return self
+    
 
-            qb_key = array('condition' => prefix.k, 'value' => v, 'escape' => escape)
-            self.qb_key[] = qb_key
-            if (self.qb_caching === TRUE)
-            
-                self.qb_cache_key[] = qb_key
-                self.qb_cache_exists[] = substr(qb_key, 3)
-            
+    def where_in(self, key = None, values = None, escape = None):
+        return self._where_in(key, values, False, 'AND ', escape)
+    
 
+    def or_where_in(self, key = None, values = None, escape = None):
+        return self._where_in(key, values, False, 'OR ', escape)
+    
+    def where_not_in(self, key = None, values = None, escape = None):    
+        return self._where_in(key, values, True, 'AND ', escape)
+    
+    def or_where_not_in(self, key = None, values = None, escape = None):
+        return self._where_in(key, values, True, 'OR ', escape)
+    
+    def _where_in(self, key = None, values = None, not_in = False, type = 'AND ', escape = None):
+    
+        if key == None or values == None:
+            return
+
+        if not isinstance(values, list):
+            values = list(values)
+
+        if not isinstance(escape, bool):
+            escape = self.__protect_identifiers
+
+        not_in = ' NOT' if not_in else ''
+
+        if escape:
+            where_in = []
+            for value in values:
+                where_in.append(self.escape(value))
+        else:
+            where_in = values.items()
         
 
-        return this
+        prefix = '' if len(self.ar_where) == 0 else type
+
+        where_in = {
+            'condition': prefix+key+not_in+" IN(" + ", ".join(self.ar_wherein) + ") "
+            'value': None,
+            'escape': escape
+        }
+
+        self.qb_where.append(where_in)
+        if self.qb_caching == True:
+            self.qb_cache_where.append(where_in)
+            self.qb_cache_exists.append('where')
+        return self
     
 
-    // --------------------------------------------------------------------
-
-    /**
-     * WHERE IN
-     *
-     * Generates a WHERE field IN('item', 'item') SQL query,
-     * joined with 'AND' if appropriate.
-     *
-     * @param   string  key The field to search
-     * @param   array   values  The values searched on
-     * @param   bool    escape
-     * @return  CI_DB_query_builder
-     */
-    def where_in(self,key = NULL, values = NULL, escape = NULL):
-    
-        return self._where_in(key, values, FALSE, 'AND ', escape)
-    
-
-    // --------------------------------------------------------------------
-
-    /**
-     * OR WHERE IN
-     *
-     * Generates a WHERE field IN('item', 'item') SQL query,
-     * joined with 'OR' if appropriate.
-     *
-     * @param   string  key The field to search
-     * @param   array   values  The values searched on
-     * @param   bool    escape
-     * @return  CI_DB_query_builder
-     */
-    def or_where_in(self,key = NULL, values = NULL, escape = NULL):
-    
-        return self._where_in(key, values, FALSE, 'OR ', escape)
-    
-
-    // --------------------------------------------------------------------
-
-    /**
-     * WHERE NOT IN
-     *
-     * Generates a WHERE field NOT IN('item', 'item') SQL query,
-     * joined with 'AND' if appropriate.
-     *
-     * @param   string  key The field to search
-     * @param   array   values  The values searched on
-     * @param   bool    escape
-     * @return  CI_DB_query_builder
-     */
-    def where_not_in(self,key = NULL, values = NULL, escape = NULL):
-    
-        return self._where_in(key, values, TRUE, 'AND ', escape)
-    
-
-    // --------------------------------------------------------------------
-
-    /**
-     * OR WHERE NOT IN
-     *
-     * Generates a WHERE field NOT IN('item', 'item') SQL query,
-     * joined with 'OR' if appropriate.
-     *
-     * @param   string  key The field to search
-     * @param   array   values  The values searched on
-     * @param   bool    escape
-     * @return  CI_DB_query_builder
-     */
-    def or_where_not_in(self,key = NULL, values = NULL, escape = NULL):
-    
-        return self._where_in(key, values, TRUE, 'OR ', escape)
-    
-
-    // --------------------------------------------------------------------
-
-    /**
-     * Internal WHERE IN
-     *
-     * @used-by where_in()
-     * @used-by or_where_in()
-     * @used-by where_not_in()
-     * @used-by or_where_not_in()
-     *
-     * @param   string  key The field to search
-     * @param   array   values  The values searched on
-     * @param   bool    not If the statement would be IN or NOT IN
-     * @param   string  type
-     * @param   bool    escape
-     * @return  CI_DB_query_builder
-     */
-    def _where_in(self,key = NULL, values = NULL, not = FALSE, type = 'AND ', escape = NULL):
-    
-        if (key === NULL OR values === NULL)
-        
-            return this
-        
-
-        if ( ! is_array(values))
-        
-            values = array(values)
-        
-
-        is_bool(escape) OR escape = self._protect_identifiers
-
-        not = (not) ? ' NOT' : ''
-
-        if (escape === TRUE)
-        
-            where_in = array()
-            foreach (values as value)
-            
-                where_in[] = self.escape(value)
-            
-        
-        else
-        
-            where_in = array_values(values)
-        
-
-        prefix = (count(self.qb_where) === 0 && count(self.qb_cache_where) === 0)
-            ? self._group_get_type('')
-            : self._group_get_type(type)
-
-        where_in = array(
-            'condition' => prefix.key.not.' IN('.implode(', ', where_in).')',
-            'value' => NULL,
-            'escape' => escape
-        )
-
-        self.qb_where[] = where_in
-        if (self.qb_caching === TRUE)
-        
-            self.qb_cache_where[] = where_in
-            self.qb_cache_exists[] = 'where'
-        
-
-        return this
-    
-
-    // --------------------------------------------------------------------
-
-    /**
-     * LIKE
-     *
-     * Generates a %LIKE% portion of the query.
-     * Separates multiple calls with 'AND'.
-     *
-     * @param   mixed   field
-     * @param   string  match
-     * @param   string  side
-     * @param   bool    escape
-     * @return  CI_DB_query_builder
-     */
-    def like(self,field, match = '', side = 'both', escape = NULL):
-    
+    def like(self, field, match = '', side = 'both', escape = None):
         return self._like(field, match, 'AND ', side, '', escape)
     
 
