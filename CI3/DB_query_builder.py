@@ -220,7 +220,7 @@ class query_builder
 
                 for (i = count(joints) - 1, pos = strlen(cond) i >= 0 i--)
                 
-                    joints[i][1] += strlen(joints[i][0]) // offset
+                    joints[i][1] += strlen(joints[i][0]) # offset
                     conditions[i] = substr(cond, joints[i][1], pos - joints[i][1])
                     pos = joints[i][1] - strlen(joints[i][0])
                     joints[i] = joints[i][0]
@@ -533,68 +533,54 @@ class query_builder
 
     def limit(self, value, offset = 0):
     
-        is_null(value) OR self.qb_limit = (int) value
-        empty(offset) OR self.qb_offset = (int) offset
+        if isinstance(value, type(None)):
+            self.qb_limit = int(value)
+        if not offset:
+            self.qb_offset = int(offset)
+        return self
+    
+    def offset(self, offset):
+        if not offset:
+            self.qb_offset = int(offset)
+        return self
+    
+    def _limit(self, sql):
+        return f"{sql} LIMIT {(f"{self.qb_offset}, " if self.qb_offset else '')} {self.qb_limit}"
 
-        return this
-    
-    def offset(self,offset):
-    
-        empty(offset) OR self.qb_offset = (int) offset
-        return this
-    
-    def _limit(self,sql):
-    
-        return sql.' LIMIT '.(self.qb_offset ? self.qb_offset.', ' : '').(int) self.qb_limit
-    
-
-    def set(self,key, value = '', escape = NULL):
-    
+    def set(self, key, value = '', escape = None):
         key = self._object_to_array(key)
 
-        if ( ! is_array(key))
+        if not isinstance(key, dict):
+            key = {key: value}
         
-            key = array(key => value)
-        
+        if isinstance(escape, bool):
+            escape = self._protect_identifiers
 
-        is_bool(escape) OR escape = self._protect_identifiers
-
-        foreach (key as k => v)
-        
-            self.qb_set[self.protect_identifiers(k, FALSE, escape)] = (escape)
-                ? self.escape(v) : v
-        
-
-        return this
+        for k,v in key            
+            self.qb_set[self.protect_identifiers(k, False, escape)] = escape.escape(v) if escape else: v
+        return self
     
-    def get_compiled_select(self,table = '', reset = TRUE):
-    
-        if (table !== '')
-        
+    def get_compiled_select(self, table = '', reset = True):
+        if table != '':
             self._track_aliases(table)
-            self.from(table)
+            self.table(table)
         
-
         select = self._compile_select()
 
-        if (reset === TRUE)
-        
+        if reset:
             self._reset_select()
         
-
         return select
     
 
-    def get(self,table = '', limit = NULL, offset = NULL):
+    def get(self, table = '', limit = None, offset = None):
     
-        if (table !== '')
-        
+        if table != '':
             self._track_aliases(table)
-            self.from(table)
+            self.table(table)
         
 
-        if ( ! empty(limit))
-        
+        if limit:
             self.limit(limit, offset)
         
 
@@ -603,20 +589,18 @@ class query_builder
         return result
     
 
-    def count_all_results(self,table = '', reset = TRUE):
-    
-        if (table !== '')
-        
+    def count_all_results(self,table = '', reset = True):
+        if table != '':
             self._track_aliases(table)
-            self.from(table)
+            self.table(table)
         
 
-        // ORDER BY usage is often problematic here (most notably
-        // on Microsoft SQL Server) and ultimately unnecessary
-        // for selecting COUNT(*) ...
-        qb_orderby       = self.qb_orderby
+        # ORDER BY usage is often problematic here (most notably
+        # on Microsoft SQL Server) and ultimately unnecessary
+        # for selecting COUNT(*) ...
+        qb_orderby = self.qb_orderby
         qb_cache_orderby = self.qb_cache_orderby
-        self.qb_orderby = self.qb_cache_orderby = array()
+        self.qb_orderby = self.qb_cache_orderby = []
 
         result = (self.qb_distinct === TRUE OR ! empty(self.qb_groupby) OR ! empty(self.qb_cache_groupby) OR self.qb_limit OR self.qb_offset)
             ? self.query(self._count_string.self.protect_identifiers('numrows')."\nFROM (\n".self._compile_select()."\n) CI_count_all_results")
@@ -692,7 +676,7 @@ class query_builder
             table = self.qb_from[0]
         
 
-        // Batch this baby
+        # Batch this baby
         affected_rows = 0
         for (i = 0, total = count(self.qb_set) i < total i += batch_size)
         
@@ -729,12 +713,12 @@ class query_builder
             row = self._object_to_array(row)
             if (count(array_diff(keys, array_keys(row))) > 0 OR count(array_diff(array_keys(row), keys)) > 0)
             
-                // batch function above returns an error on an empty array
+                # batch function above returns an error on an empty array
                 self.qb_set[] = array()
                 return
             
 
-            ksort(row) // puts row in the same order as our keys
+            ksort(row) # puts row in the same order as our keys
 
             if (escape !== FALSE)
             
@@ -864,7 +848,7 @@ class query_builder
 
     def get_compiled_update(self,table = '', reset = TRUE):
     
-        // Combine any cached components with the current statements
+        # Combine any cached components with the current statements
         self._merge_cache()
 
         if (self._validate_update(table) === FALSE)
@@ -884,7 +868,7 @@ class query_builder
 
     def update(self,table = '', set = NULL, where = NULL, limit = NULL):
     
-        // Combine any cached components with the current statements
+        # Combine any cached components with the current statements
         self._merge_cache()
 
         if (set !== NULL)
@@ -933,7 +917,7 @@ class query_builder
 
     def update_batch(self,table, set = NULL, index = NULL, batch_size = 100):
     
-        // Combine any cached components with the current statements
+        # Combine any cached components with the current statements
         self._merge_cache()
 
         if (index === NULL)
@@ -968,7 +952,7 @@ class query_builder
             table = self.qb_from[0]
         
 
-        // Batch this baby
+        # Batch this baby
         affected_rows = 0
         for (i = 0, total = count(self.qb_set_ub) i < total i += batch_size)
         
@@ -1019,7 +1003,7 @@ class query_builder
 
         if ( ! is_array(key))
         
-            // @todo error
+            # @todo error
         
 
         is_bool(escape) OR escape = self._protect_identifiers
@@ -1109,7 +1093,7 @@ class query_builder
 
     def delete(self,table = '', where = '', limit = NULL, reset_data = TRUE):
     
-        // Combine any cached components with the current statements
+        # Combine any cached components with the current statements
         self._merge_cache()
 
         if (table === '')
@@ -1193,23 +1177,23 @@ class query_builder
             return
         
 
-        // Does the string contain a comma?  If so, we need to separate
-        // the string into discreet statements
+        # Does the string contain a comma?  If so, we need to separate
+        # the string into discreet statements
         if (strpos(table, ',') !== FALSE)
         
             return self._track_aliases(explode(',', table))
         
 
-        // if a table alias is used we can recognize it by a space
+        # if a table alias is used we can recognize it by a space
         if (strpos(table, ' ') !== FALSE)
         
-            // if the alias is written with the AS keyword, remove it
+            # if the alias is written with the AS keyword, remove it
             table = preg_replace('/\s+AS\s+/i', ' ', table)
 
-            // Grab the alias
+            # Grab the alias
             table = trim(strrchr(table, ' '))
 
-            // Store the alias, if it doesn't already exist
+            # Store the alias, if it doesn't already exist
             if ( ! in_array(table, self.qb_aliased_tables, TRUE))
             
                 self.qb_aliased_tables[] = table
@@ -1224,10 +1208,10 @@ class query_builder
 
     def _compile_select(self,select_override = FALSE):
     
-        // Combine any cached components with the current statements
+        # Combine any cached components with the current statements
         self._merge_cache()
 
-        // Write the "select" portion of the query
+        # Write the "select" portion of the query
         if (select_override !== FALSE)
         
             sql = select_override
@@ -1242,9 +1226,9 @@ class query_builder
             
             else
             
-                // Cycle through the "select" portion of the query and prep each column name.
-                // The reason we protect identifiers here rather than in the select() function
-                // is because until the user calls the from() function we don't know if there are aliases
+                # Cycle through the "select" portion of the query and prep each column name.
+                # The reason we protect identifiers here rather than in the select() function
+                # is because until the user calls the from() function we don't know if there are aliases
                 foreach (self.qb_select as key => val)
                 
                     no_escape = isset(self.qb_no_escape[key]) ? self.qb_no_escape[key] : NULL
@@ -1255,13 +1239,13 @@ class query_builder
             
         
 
-        // Write the "FROM" portion of the query
+        # Write the "FROM" portion of the query
         if (count(self.qb_from) > 0)
         
             sql .= "\nFROM ".self._from_tables()
         
 
-        // Write the "JOIN" portion of the query
+        # Write the "JOIN" portion of the query
         if (count(self.qb_join) > 0)
         
             sql .= "\n".implode("\n", self.qb_join)
@@ -1270,9 +1254,9 @@ class query_builder
         sql .= self._compile_wh('qb_where')
             .self._compile_group_by()
             .self._compile_wh('qb_having')
-            .self._compile_order_by() // ORDER BY
+            .self._compile_order_by() # ORDER BY
 
-        // LIMIT
+        # LIMIT
         if (self.qb_limit !== FALSE OR self.qb_offset)
         
             return self._limit(sql."\n")
@@ -1287,7 +1271,7 @@ class query_builder
         
             for (i = 0, c = count(self.qb_key) i < c i++)
             
-                // Is this condition already compiled?
+                # Is this condition already compiled?
                 if (is_string(self.qb_key[i]))
                 
                     continue
@@ -1298,7 +1282,7 @@ class query_builder
                     continue
                 
 
-                // Split multiple conditions
+                # Split multiple conditions
                 conditions = preg_split(
                     '/((?:^|\s+)AND\s+|(?:^|\s+)OR\s+)/i',
                     self.qb_key[i]['condition'],
@@ -1314,14 +1298,14 @@ class query_builder
                         continue
                     
 
-                    // matches = array(
-                    //  0 => '(test <= foo)',   /* the whole thing */
-                    //  1 => '(',       /* optional */
-                    //  2 => 'test',        /* the field name */
-                    //  3 => ' <= ',        /* op */
-                    //  4 => 'foo',     /* optional, if op is e.g. 'IS NULL' */
-                    //  5 => ')'        /* optional */
-                    // )
+                    # matches = array(
+                    #  0 => '(test <= foo)',   /* the whole thing */
+                    #  1 => '(',       /* optional */
+                    #  2 => 'test',        /* the field name */
+                    #  3 => ' <= ',        /* op */
+                    #  4 => 'foo',     /* optional, if op is e.g. 'IS NULL' */
+                    #  5 => ')'        /* optional */
+                    # )
 
                     if ( ! empty(matches[4]))
                     
@@ -1349,7 +1333,7 @@ class query_builder
         
             for (i = 0, c = count(self.qb_groupby) i < c i++)
             
-                // Is it already compiled?
+                # Is it already compiled?
                 if (is_string(self.qb_groupby[i]))
                 
                     continue
@@ -1401,7 +1385,7 @@ class query_builder
         array = array()
         foreach (get_object_vars(object) as key => val)
         
-            // There are some built in keys we need to ignore for this conversion
+            # There are some built in keys we need to ignore for this conversion
             if ( ! is_object(val) && ! is_array(val) && key !== '_parent_name')
             
                 array[key] = val
@@ -1424,7 +1408,7 @@ class query_builder
 
         foreach (fields as val)
         
-            // There are some built in keys we need to ignore for this conversion
+            # There are some built in keys we need to ignore for this conversion
             if (val !== '_parent_name')
             
                 i = 0
@@ -1480,7 +1464,7 @@ class query_builder
             qb_no_escape = self.qb_cache_no_escape
         
 
-        foreach (array_unique(self.qb_cache_exists) as val) // select, from, etc.
+        foreach (array_unique(self.qb_cache_exists) as val) # select, from, etc.
         
             qb_variable = 'qb_'.val
             qb_cache_var    = 'qb_cache_'.val
